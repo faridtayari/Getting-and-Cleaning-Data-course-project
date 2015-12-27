@@ -70,3 +70,20 @@ train_test_merged2$activity<-revalue(train_test_merged2$activity, replc)
 
 
 #########################part 5
+train_test_merged2<-rename(train_test_merged2,c(X1="subject"))
+train_test_average<-data.frame(subject=character(180), activity=character(180), Average=numeric(180))
+train_test_average$activity<-""
+train_test_average$subject<-""
+train_test_average$Average<-0
+
+l<-1
+for(j in c("WALKING","WALKING_UPSTAIRS","WALKING_DOWNSTAIRS","SITTING","STANDING","LAYING")) {
+        for(i in 1:30) {
+                train_test_average[l,1]<-c(i)
+                train_test_average[l,2]<-c(j)
+                for(k in 1:561) {
+                        train_test_average[l,k+2]<-mean(train_test_merged2[(train_test_merged2$subject==i)&(train_test_merged2$activity==j),k+2])
+                }      
+                l<-l+1                        
+        }
+}
