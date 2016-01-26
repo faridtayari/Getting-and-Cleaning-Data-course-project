@@ -2,88 +2,76 @@ library(dplyr)
 library(plyr)
 library(reshape)
 
+############################## Reading and cleaning the data:
 xtrain<-read.table("./UCI HAR Dataset/train/x_train.txt", header=TRUE)
-ytrain<-read.table("./UCI HAR Dataset/train/y_train.txt", header=TRUE)
 xtest<-read.table("./UCI HAR Dataset/test/x_test.txt", header=TRUE)
-ytest<-read.table("./UCI HAR Dataset/test/y_test.txt", header=TRUE)
-activity<-read.table("./UCI HAR Dataset/activity_labels.txt")
 
-#name of the 561 variables
+#Activity code
+ytrain<-read.table("./UCI HAR Dataset/train/y_train.txt", header=TRUE)
+ytest<-read.table("./UCI HAR Dataset/test/y_test.txt", header=TRUE)
+names(ytrain)<-"Activity_code"
+names(ytest)<-"Activity_code"
+
+#Activity names 6x2
+activity_name<-read.table("./UCI HAR Dataset/activity_labels.txt")
+
+#variable names 561x2
 featurse<-read.table("./UCI HAR Dataset/features.txt")
+var_name<-as.character(featurse$V2)
+var_name<-gsub("\\()","",var_name)
+var_name<-gsub("\\(","_",var_name)
+var_name<-gsub("\\)","",var_name)
+var_name<-gsub(",","_",var_name)
+var_name<-gsub("`","_",var_name)
+
+names(xtrain)<-var_name
+names(xtest)<-var_name
 
 #Each row identifies the subject who performed the activity for each window sample. Its range is from 1 to 30.
 #people who performed the test
 sub_train<-read.table("./UCI HAR Dataset/train/subject_train.txt", header=TRUE)
-
-
 sub_test<-read.table("./UCI HAR Dataset/test//subject_test.txt", header=TRUE)
-#table(sub_test)
+names(sub_train)<-"subject"
+names(sub_test)<-"subject"
 
 
 ##############################Part 1:
-#cbiding subject, ytrain, and xtrain and then merging by subject
+#cbiding subject, ytrain, and xtrain
 
-#
 subyxtrain<-cbind(sub_train,ytrain,xtrain)
 subyxtest<-cbind(sub_test,ytest,xtest)
-subyxtest<-rename(subyxtest,c(X2="X1"))
-#test_train_by_sub<-join(subxtrain,subxtest, match="first")
 
-#the merge function is so slow but join() function works well
-#test_train_by_lable<-merge(yxtrain,yxtest, by="X1", all=TRUE)
-
-train_test_merged<-join(subyxtrain,subyxtest)
+#rbiding test and train data
+train_test_merged<-rbind(subyxtrain,subyxtest)
 
 
 ##############################Part 2 and part 4:
 
+#Extracting only the measurements on the mean and standard deviation for each measurement. 
 
-#changing the names of the variables
-var_name<-as.character(featurse$V2)
-xtrain2<-xtrain
-colnames(xtrain2)<-var_name
-xtest2<-xtest
-colnames(xtest2)<-var_name
+## removing columns with duplicated names
+train_test_merged2<-train_test_merged[names(train_test_merged[duplicated(names(train_test_merged))==FALSE])]
 
-subyxtrain2<-cbind(sub_train, ytrain,xtrain2)
-subyxtest2<-cbind(sub_test,ytest,xtest2)
-subyxtest2<-rename(subyxtest2,c(X2="X1"))
-train_test_merged2<-join(subyxtrain2,subyxtest2)
+## selecting data with "mean" or "std" in the column name. 
+selected_var<-c(1,2,grep(c("mean"),names(train_test_merged2)),grep(c("std"),names(train_test_merged2)))
+selected_data<-select(train_test_merged2, selected_var)
 
-var_name_merged<-names(train_test_merged2)
-#Extracts only the measurements on the mean and standard deviation for each measurement. 
-
-selected_var_merged<-c(grep(c("mean"),var_name_merged),grep(c("std"),var_name_merged))
-selected_data<-select(xtrain, selected_var_merged)
-selected_var_name<-(var_name_merged[grepl("mean",var_name_merged) | grepl("std",var_name_merged)])
-colnames(selected_data)<-selected_var_name
 
 
 #########################part 3
-train_test_merged2<-rename(train_test_merged2,c(X5="activity"))
-train_test_merged2$activity<-as.factor(train_test_merged2$activity)
-replc<-c("1"="WALKING", "2"="WALKING_UPSTAIRS", "3"="WALKING_DOWNSTAIRS", "4"="SITTING", "5"="STANDING","6"="LAYING")
-train_test_merged2$activity<-revalue(train_test_merged2$activity, replc)
+
+selected_data$Activity_code <- factor(selected_data$Activity_code, 
+                                      label = c("Walking", "Walking Upstairs", 
+                                                "Walking Downstairs", "Sitting", "Standing", "Laying"))
+selected_data<-rename(selected_data,c(Activity_code="activity_name"))
 
 #########################part 4: 
 #part 4 and part 2 are coded together 
 
-
 #########################part 5
-train_test_merged2<-rename(train_test_merged2,c(X1="subject"))
-train_test_average<-data.frame(subject=character(180), activity=character(180), Average=numeric(180))
-train_test_average$activity<-""
-train_test_average$subject<-""
-train_test_average$Average<-0
 
-l<-1
-for(j in c("WALKING","WALKING_UPSTAIRS","WALKING_DOWNSTAIRS","SITTING","STANDING","LAYING")) {
-        for(i in 1:30) {
-                train_test_average[l,1]<-c(i)
-                train_test_average[l,2]<-c(j)
-                for(k in 1:561) {
-                        train_test_average[l,k+2]<-mean(train_test_merged2[(train_test_merged2$subject==i)&(train_test_merged2$activity==j),k+2])
-                }      
-                l<-l+1                        
-        }
-}
+TidyData <- selected_data[, lapply(.SD, mean), by = 'subject,Activity_name']
+
+grouped_selected_data <- group_by(selected_data,subject,activity_name)
+tidy_data <- summarize_each(grouped_selected_data,funs(mean))
+write.csv(file="tidy_data.csv",tidy_data)
