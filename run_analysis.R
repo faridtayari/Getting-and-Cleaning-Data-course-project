@@ -70,8 +70,6 @@ selected_data<-rename(selected_data,c(Activity_code="activity_name"))
 
 #########################part 5
 
-TidyData <- selected_data[, lapply(.SD, mean), by = 'subject,Activity_name']
-
 grouped_selected_data <- group_by(selected_data,subject,activity_name)
 tidy_data <- summarize_each(grouped_selected_data,funs(mean))
-write.csv(file="tidy_data.csv",tidy_data)
+write.csv(file="tidy_data.csv",tidy_data,row.names = FALSE)
